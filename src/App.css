@@ -1,0 +1,16 @@
+.svg-hover:hover {
+  svg {
+    fill: white;
+  }
+}
+
+.range-hover:hover {
+  transition: fill 0.1s;
+  div {
+    background-color: oklch(0.723 0.219 149.579);
+
+    button {
+      display: block;
+    }
+  }
+}
