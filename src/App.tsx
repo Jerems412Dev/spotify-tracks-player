@@ -1,14 +1,12 @@
 import { CirclePlus, LayoutList, Maximize2, MicVocal, MonitorSpeaker, Plus, Shuffle, Volume2, VolumeX } from 'lucide-react';
 import './App.css';
-import img from './assets/images.jpeg';
 import { useRef, useState } from 'react';
+import Track from './Track';
 
 function App() {
   const [playing, setPlaying] = useState(false);
-  const [repeat, setRepeat] = useState(1 | 2 | 3);
+  const [repeat, setRepeat] = useState(1);
   const [shuffle, setShuffle] = useState(false);
-  const [next, setNext] = useState(false);
-  const [previous, setPrevious] = useState(false);
   const [like, setLike] = useState(false);
   const [mic, setMic] = useState(false);
   const [device, setDevice] = useState(false);
@@ -17,45 +15,72 @@ function App() {
   const [miniPlayer, setMiniPlayer] = useState(false);
   const [maximize, setMaximize] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(0);
+  const [prevTrack, setPrevTrack] = useState(0);
+  const [currentTime, setCurrentTime] = useState("0:00");
+  const [isDragging, setIsDragging] = useState(false);
 
   const rangeAudioRef = useRef<HTMLDivElement>(null);
   const rangeDivAudioRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const tracks = [
+  const [tracks, setTracks] = useState<Track[]>([
     {
       title: "Didn't cha know",
       srcTrack: "./music/Didntchaknow.mp3",
       srcImg: "./img/Didntchaknow.jpeg",
-      artist: "Erikah Badu"
+      artist: "Erikah Badu",
+      isLiked: false
     },
     {
       title: "RONDA",
       srcTrack: "./music/RONDA.mp3",
       srcImg: "./img/RONDA.jpg",
-      artist: "FEEL"
+      artist: "FEEL",
+      isLiked: false
     },
     {
       title: "Pink + White",
       srcTrack: "./music/Pink_+_White.mp3",
       srcImg: "./img/Pink_+_White.jpg",
-      artist: "Frank Ocean"
+      artist: "Frank Ocean",
+      isLiked: false
     },
     {
       title: "Levitating",
       srcTrack: "./music/Levitating.mp3",
       srcImg: "./img/Levitating.jpg",
-      artist: "Dua Lipa"
+      artist: "Dua Lipa",
+      isLiked: false
+    },
+    {
+      title: "Is It a Crime",
+      srcTrack: "./music/is_it_a_crime.mp3",
+      srcImg: "./img/is_it_a_crime.jpeg",
+      artist: "Sade",
+      isLiked: false
     }
-  ];
+  ]);
+
+  const [totalTime, setTotalTime] = useState(formatTotalTime(238));
 
   const handleRepeat = () => {
     if(repeat === 1) {
-      setRepeat(2)
+      setRepeat(2);
     } else if(repeat === 2) {
-      setRepeat(3)
+      setRepeat(3);
+      (audioRef.current) ? audioRef.current.loop = true : null;
     } else {
-      setRepeat(1)
+      setRepeat(1);
+      (audioRef.current) ? audioRef.current.loop = false : null;
+    }
+  };
+
+  const handleShuffle = () => {
+    if(shuffle) {
+      setShuffle(false);
+    } else {
+      setShuffle(true);
+      setPrevTrack(currentTrack);
     }
   };
 
@@ -66,20 +91,141 @@ function App() {
     }else {
       audioRef.current?.play();
       setPlaying(true);
+      seekUpdate();
     }
-  }
+  };
   
   const handleNextTrack = () => {
-    if(next === true){
-      setCurrentTrack((currentTrack) => (currentTrack >= 3 ? 0 : currentTrack + 1));
-      setNext(false);
-      audioRef.current?.play();
-      setPlaying(true);
-      console.log(tracks[currentTrack]);
-    }else {
-      setNext(true);
+    var val;
+    if(shuffle && repeat === 1) {
+      setPrevTrack(currentTrack);
+      val = Math.floor(Math.random() * tracks.length-1);
+      while(val === prevTrack) {
+        val = Math.floor(Math.random() * tracks.length-1);
+      }
+    } else {
+      setPrevTrack(currentTrack);
+      val = currentTrack >= tracks.length-1 ? 0 : currentTrack + 1;
     }
-  }
+    setCurrentTrack(val);
+    audioRef.current?.load();
+    setPlaying(true);
+    audioRef.current?.addEventListener('canplay', () => {
+      audioRef.current?.play().catch(error => console.error(error));
+      setTotalTime(formatTotalTime(audioRef.current?.duration));
+      seekUpdate();
+    });
+    setLike(tracks[val].isLiked);
+  };
+
+  const handlePreviousTrack = () => {
+    if(audioRef.current && audioRef.current?.currentTime <= tracks.length-1) {
+      var val;
+      if(shuffle && repeat === 1) {
+        val = prevTrack;
+      } else {
+        val = currentTrack <= 0 ? tracks.length-1 : currentTrack - 1;
+      }
+      setCurrentTrack(val);
+      audioRef.current?.load();
+      setPlaying(true);
+      audioRef.current?.addEventListener('canplay', () => {
+        audioRef.current?.play().catch(error => console.error(error));
+      });
+      setLike(tracks[val].isLiked);
+    } else if(audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleLike = () => {
+    if(like) {
+      setLike(false);
+    } else {
+      setLike(true);
+    }
+    setTracks(prevTracks =>
+      prevTracks.map((track, i) =>
+        i === currentTrack ? { ...track, isLiked: !track.isLiked } : track
+      )
+    );
+  };
+
+  const isEnded = () => {
+    if(audioRef.current && audioRef.current.ended && shuffle === true && repeat === 1) {
+      setPrevTrack(currentTrack);
+      var val = Math.floor(Math.random() * tracks.length-1);
+      while(val === prevTrack) {
+        val = Math.floor(Math.random() * tracks.length-1);
+      }
+      setCurrentTrack(val);
+      audioRef.current?.load();
+      setPlaying(true);
+      audioRef.current?.addEventListener('canplay', () => {
+        audioRef.current?.play().catch(error => console.error(error));
+        setTotalTime(formatTotalTime(audioRef.current?.duration));
+        seekUpdate();
+      });
+      setLike(tracks[val].isLiked);
+    } else if(audioRef.current && audioRef.current.ended && repeat === 2) {
+      handleNextTrack();
+    }  else if(audioRef.current && audioRef.current.ended && repeat === 1 && shuffle === false) {
+      audioRef.current?.pause();
+      setPlaying(false);
+    }
+  };
+
+  const handleRangeAudioRef = (e: React.MouseEvent<HTMLDivElement>) => {
+    if(rangeAudioRef.current && rangeDivAudioRef.current && audioRef.current) {
+      const rect = rangeAudioRef.current?.getBoundingClientRect();
+      let offsetX = e.clientX - rect.left;
+      let rectWidth = rect.width -25; 
+      if (offsetX < 0) offsetX = 0;
+      if (offsetX > rectWidth) offsetX = rectWidth;
+      rangeDivAudioRef.current.style.width = `${offsetX}px`;
+      audioRef.current.currentTime = (offsetX / rectWidth) * audioRef.current.duration;
+    } 
+  };
+
+  const mouseAudioMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+    if(rangeAudioRef.current && rangeDivAudioRef.current && audioRef.current) {
+      const rect = rangeAudioRef.current.getBoundingClientRect();
+      let offsetX = e.clientX - rect.left;
+      let rectWidth = rect.width;
+      if (offsetX < 0) offsetX = 0;
+      if (offsetX > rectWidth) offsetX = rectWidth;
+      rangeDivAudioRef.current.style.width = `${offsetX}px`;
+      audioRef.current.currentTime = (offsetX / rectWidth) * audioRef.current.duration;
+      console.log(offsetX);
+    } 
+  };
+
+  const mouseAudioUp = () => {
+    setIsDragging(false);
+    document.removeEventListener('mousemove', mouseAudioMove);
+    document.removeEventListener('mouseup', mouseAudioUp);
+  };
+
+  const mouseDown = (e: React.MouseEventHandler<HTMLButtonElement>) => {
+    setIsDragging(true);
+    document.addEventListener('mousemove', mouseAudioMove);
+    document.addEventListener('mouseup', mouseAudioUp);
+  };
+
+  function seekUpdate() {
+    let intervalId = setInterval(() => {
+      if (audioRef.current && rangeAudioRef.current && rangeDivAudioRef.current && !audioRef.current.paused) {
+        setCurrentTime(formatTime(audioRef.current.currentTime));
+        let val = (
+          (audioRef.current.currentTime / audioRef.current.duration) *
+          rangeAudioRef.current.getBoundingClientRect().width
+        ).toString();
+        rangeDivAudioRef.current.style.width = `${val}px`;
+      }
+    }, 1000);
+  };
+
   return (
     <>
       <div 
@@ -101,25 +247,27 @@ function App() {
               <li className="whitespace-nowrap font-[400] text-[#bcbcbc] text-xs hover:underline hover:text-white underline-offset-1 cursor-pointer">{tracks[currentTrack].artist}</li>
             </ul>
             <button
-              onClick={() => setLike(!like)}
+              onClick={handleLike}
               className="flex flex-row items-center justify-center bg-transparent rounded-full outline-none cursor-pointer"
             >
               {like ? 
-                <CirclePlus className="text-[#bcbcbc] w-[1.1rem] hover:text-white" />
-                :
                 <svg className="text-green-500 w-[1.2rem] hover:scale-[1.05]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22ZM17.4571 9.45711L11 15.9142L6.79289 11.7071L8.20711 10.2929L11 13.0858L16.0429 8.04289L17.4571 9.45711Z"></path></svg>
+                :
+                <CirclePlus className="text-[#bcbcbc] w-[1.1rem] hover:text-white" />
               }
             </button>
           </div>
           <div className="flex flex-col w-[40%] gap-y-2">
             <div className="flex flex-row items-center justify-center gap-x-4">
               <button 
-                onClick={() => setShuffle(!shuffle)}
+                onClick={handleShuffle}
                 className="flex flex-col items-center justify-center gap-y-0 text-[#bcbcbc] hover:text-white outline-none cursor-pointer">
                 <Shuffle className={shuffle ? "w-[1.2rem] text-green-500" : "w-[1.2rem] text-[#bcbcbc] hover:text-white"} />
                 {shuffle && <span className="text-green-500 mt-7 text-[0.6rem] absolute">•</span>}
               </button>
-              <button className="flex flex-col items-center justify-center gap-y-0 text-[#bcbcbc] hover:text-white hover:opacity-90 hover:scale-[1.05] outline-none cursor-pointer">
+              <button 
+                onClick={handlePreviousTrack}
+                className="flex flex-col items-center justify-center gap-y-0 text-[#bcbcbc] hover:text-white hover:opacity-90 hover:scale-[1.05] outline-none cursor-pointer">
                 <svg className="w-[1.5rem]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 11.3333L18.2227 4.51823C18.4524 4.36506 18.7628 4.42714 18.916 4.65691C18.9708 4.73904 19 4.83555 19 4.93426V19.0657C19 19.3419 18.7761 19.5657 18.5 19.5657C18.4013 19.5657 18.3048 19.5365 18.2227 19.4818L8 12.6667V19C8 19.5523 7.55228 20 7 20C6.44772 20 6 19.5523 6 19V5C6 4.44772 6.44772 4 7 4C7.55228 4 8 4.44772 8 5V11.3333Z"></path></svg>
               </button>
               <button 
@@ -153,14 +301,29 @@ function App() {
               </button>
             </div>
             <div className="w-full flex flex-row items-center justify-center gap-x-2">
-                <audio ref={audioRef} src={tracks[currentTrack].srcTrack}></audio>
-                <span className="text-xs text-[#bcbcbc] font-[CircularStd]">0:30</span>
-                <div className="w-[80%] h-1 flex flex-row bg-[#4d4d4d] rounded-xl cursor-pointer range-hover">
-                  <div className="relative w-[60%] h-full flex flex-row items-center bg-white rounded-xl justify-end">
-                    <button className="hidden absolute w-[0.8rem] h-[0.8rem] bg-white rounded-full outline-none cursor-pointer box-border"></button>
+                <audio 
+                  ref={audioRef} 
+                  src={tracks[currentTrack].srcTrack} 
+                  onEnded={isEnded}
+                >
+                </audio>
+                <span className="w-[5%] text-xs text-[#bcbcbc] font-[CircularStd]">{currentTime}</span>
+                <div 
+                  ref={rangeAudioRef}
+                  onClick={handleRangeAudioRef}
+                  className="w-[80%] h-1 flex flex-row bg-[#4d4d4d] rounded-xl cursor-pointer range-hover"
+                >
+                  <div 
+                    ref={rangeDivAudioRef}
+                    className="relative h-full flex flex-row items-center bg-white rounded-xl justify-end transition-discrete"
+                  >
+                    <button 
+                      className="hidden absolute w-[0.8rem] h-[0.8rem] bg-white rounded-full outline-none cursor-pointer box-border"
+                      onMouseDown={mouseDown}
+                    ></button>
                   </div>
                 </div>
-                <span className="text-xs text-[#bcbcbc] font-[CircularStd]">0:30</span>
+                <span className="w-[5%] text-xs text-[#bcbcbc] font-[CircularStd]">{totalTime}</span>
             </div>
           </div>
           <div className="w-[30%] flex flex-row items-center justify-end gap-x-3">
@@ -213,6 +376,24 @@ function App() {
       </div>
     </>
   )
+}
+
+//Helper
+
+function padZero(num: any) {
+  return num < 10 ? `0${num}` : num.toString();
+}
+
+function formatTime(time: any) {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time - minutes * 60);
+  return `${minutes}:${padZero(seconds)}`;
+}
+
+function formatTotalTime(time: any) {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time - minutes * 60);
+  return `${minutes}:${padZero(seconds)}`;
 }
 
 export default App
