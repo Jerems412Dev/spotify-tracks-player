@@ -135,6 +135,7 @@ function App() {
       setPlaying(true);
       audioRef.current?.addEventListener('canplay', () => {
         audioRef.current?.play().catch(error => console.error(error));
+        setTotalTime(formatTotalTime(audioRef.current?.duration));
       });
       setLike(tracks[val].isLiked);
     } else if(audioRef.current) {
