@@ -275,7 +275,7 @@ function App() {
   }
 
   function seekUpdate() {
-    let intervalId = setInterval(() => {
+    setInterval(() => {
       if (audioRef.current && rangeAudioRef.current && rangeDivAudioRef.current && !audioRef.current.paused) {
         setCurrentTime(formatTime(audioRef.current.currentTime));
         let val = (
