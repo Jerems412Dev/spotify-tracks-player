@@ -98,6 +98,14 @@ function App() {
       seekUpdate();
     }
   };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.code === "Space" || event.key === " ") {
+      event.preventDefault();
+      handlePlayAudio();
+      console.log("Yeah");
+    }
+  };
   
   const handleNextTrack = () => {
     var val;
@@ -292,6 +300,8 @@ function App() {
     <>
       <div 
         className="w-full h-screen flex flex-col items-center justify-end bg-[#121212]"
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
       >
         <div 
           className="flex flex-row items-center justify-between w-full h-[15vh] bg-black px-4 py-4" 
