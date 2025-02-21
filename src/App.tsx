@@ -1,4 +1,4 @@
-import { CirclePlus, LayoutList, Maximize2, MicVocal, MonitorSpeaker, Plus, Shuffle, Volume2, VolumeX } from 'lucide-react';
+import { CirclePlus, LayoutList, Maximize2, MicVocal, MonitorSpeaker, Shuffle, Volume2, VolumeX } from 'lucide-react';
 import './App.css';
 import { useRef, useState } from 'react';
 import Track from './Track';
@@ -17,11 +17,15 @@ function App() {
   const [currentTrack, setCurrentTrack] = useState(0);
   const [prevTrack, setPrevTrack] = useState(0);
   const [currentTime, setCurrentTime] = useState("0:00");
-  const [isDragging, setIsDragging] = useState(false);
+  const isDragging = useRef(false);
+  const prevVolume = useRef(0);
 
   const rangeAudioRef = useRef<HTMLDivElement>(null);
   const rangeDivAudioRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const rangeVolumeRef = useRef<HTMLDivElement>(null);
+  const rangeDivVolumeRef = useRef<HTMLDivElement>(null);
 
   const [tracks, setTracks] = useState<Track[]>([
     {
@@ -175,11 +179,12 @@ function App() {
     }
   };
 
+  //Audio range
   const handleRangeAudioRef = (e: React.MouseEvent<HTMLDivElement>) => {
     if(rangeAudioRef.current && rangeDivAudioRef.current && audioRef.current) {
       const rect = rangeAudioRef.current?.getBoundingClientRect();
       let offsetX = e.clientX - rect.left;
-      let rectWidth = rect.width -25; 
+      let rectWidth = rect.width; 
       if (offsetX < 0) offsetX = 0;
       if (offsetX > rectWidth) offsetX = rectWidth;
       rangeDivAudioRef.current.style.width = `${offsetX}px`;
@@ -188,7 +193,7 @@ function App() {
   };
 
   const mouseAudioMove = (e: MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging.current) return;
     if(rangeAudioRef.current && rangeDivAudioRef.current && audioRef.current) {
       const rect = rangeAudioRef.current.getBoundingClientRect();
       let offsetX = e.clientX - rect.left;
@@ -197,21 +202,77 @@ function App() {
       if (offsetX > rectWidth) offsetX = rectWidth;
       rangeDivAudioRef.current.style.width = `${offsetX}px`;
       audioRef.current.currentTime = (offsetX / rectWidth) * audioRef.current.duration;
-      console.log(offsetX);
     } 
   };
 
   const mouseAudioUp = () => {
-    setIsDragging(false);
+    isDragging.current = false;
     document.removeEventListener('mousemove', mouseAudioMove);
     document.removeEventListener('mouseup', mouseAudioUp);
   };
 
-  const mouseDown = (e: React.MouseEventHandler<HTMLButtonElement>) => {
-    setIsDragging(true);
+  const mouseAudioDown = () => {
+    isDragging.current = true;
     document.addEventListener('mousemove', mouseAudioMove);
     document.addEventListener('mouseup', mouseAudioUp);
   };
+
+  //Volume Range
+  const handleRangeVolumeRef = (e: React.MouseEvent<HTMLDivElement>) => {
+    if(rangeVolumeRef.current && rangeDivVolumeRef.current && audioRef.current) {
+      const rect = rangeVolumeRef.current?.getBoundingClientRect();
+      let offsetX = e.clientX - rect.left;
+      let rectWidth = rect.width; 
+      if (offsetX < 0) offsetX = 0;
+      if (offsetX > rectWidth) offsetX = rectWidth;
+      rangeDivVolumeRef.current.style.width = `${offsetX}px`;
+      audioRef.current.volume = offsetX/100;
+      setMute(false);
+    } 
+  };
+
+  const mouseVolumeMove = (e: MouseEvent) => {
+    if (!isDragging.current) return;
+    if(rangeVolumeRef.current && rangeDivVolumeRef.current && audioRef.current) {
+      const rect = rangeVolumeRef.current.getBoundingClientRect();
+      let offsetX = e.clientX - rect.left;
+      let rectWidth = rect.width;
+      if (offsetX < 0) offsetX = 0;
+      if (offsetX > rectWidth) offsetX = rectWidth;
+      rangeDivVolumeRef.current.style.width = `${offsetX}px`;
+      audioRef.current.volume = offsetX / 100;
+    } 
+  };
+
+  const mouseVolumeUp = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', mouseVolumeMove);
+    document.removeEventListener('mouseup', mouseVolumeUp);
+  };
+
+  const mouseVolumeDown = () => {
+    isDragging.current = true;
+    setMute(false);
+    document.addEventListener('mousemove', mouseVolumeMove);
+    document.addEventListener('mouseup', mouseVolumeUp);
+  };
+
+  const handleMute = () => {
+    if(mute) {
+      setMute(false);
+      if(audioRef.current && rangeDivVolumeRef.current) {
+        audioRef.current.volume = prevVolume.current.valueOf();
+        rangeDivVolumeRef.current.style.width = (prevVolume.current.valueOf() * 100) + "px";
+      }
+    } else {
+      setMute(true);
+      if(audioRef.current && rangeDivVolumeRef.current) {
+        prevVolume.current = audioRef.current.volume;
+        audioRef.current.volume = 0;
+        rangeDivVolumeRef.current.style.width = "0px";
+      }
+    }
+  }
 
   function seekUpdate() {
     let intervalId = setInterval(() => {
@@ -319,7 +380,7 @@ function App() {
                   >
                     <button 
                       className="hidden absolute w-[0.8rem] h-[0.8rem] bg-white rounded-full outline-none cursor-pointer box-border"
-                      onMouseDown={mouseDown}
+                      onMouseDown={mouseAudioDown}
                     ></button>
                   </div>
                 </div>
@@ -346,7 +407,7 @@ function App() {
               {device && <span className="text-green-500 mt-7 text-[0.6rem] absolute">•</span>}
             </button>
             <button 
-              onClick={() => setMute(!mute)}
+              onClick={handleMute}
               className="flex flex-col items-center justify-center gap-y-0 text-[#bcbcbc] hover:text-white hover:opacity-90 hover:scale-[1.05] outline-none cursor-pointer">
               {mute ?
                 <VolumeX className="w-[1.2rem]" />
@@ -354,9 +415,17 @@ function App() {
                 <Volume2 className="w-[1.2rem]" />
               }
             </button>
-            <div className="w-[25%] h-1 flex flex-row bg-[#4d4d4d] rounded-xl cursor-pointer range-hover">
-              <div className="relative w-[60%] h-full flex flex-row items-center bg-white rounded-xl justify-end">
-                <button className="hidden absolute w-[0.8rem] h-[0.8rem] bg-white rounded-full outline-none cursor-pointer box-border"></button>
+            <div 
+              ref={rangeVolumeRef}
+              onClick={handleRangeVolumeRef}
+              className="w-[25%] h-1 flex flex-row bg-[#4d4d4d] rounded-xl cursor-pointer range-hover">
+              <div 
+                ref={rangeDivVolumeRef}
+                className="relative w-[100%] h-full flex flex-row items-center bg-white rounded-xl justify-end">
+                <button 
+                  className="hidden absolute w-[0.8rem] h-[0.8rem] bg-white rounded-full outline-none cursor-pointer box-border"
+                  onMouseDown={mouseVolumeDown}
+                ></button>
               </div>
             </div>
             <button 
